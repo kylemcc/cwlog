@@ -46,8 +46,8 @@ type LogWriter struct {
 
 	started bool
 
-	// scanErr holds any error that is returned by the internal scanner
-	scanErr error
+	// scanErr will receieve the return value of the internal scanner
+	scanErr chan error
 
 	// pw and pr (io.Pipe) are used to pipe input delivered to Write to the internal
 	// bufio.Scanner which reads input in a linewise fashion
@@ -66,6 +66,7 @@ func New(logGroup, logStream string, client Client) *LogWriter {
 		pw:         pw,
 		pr:         pr,
 		ticker:     time.NewTicker(2 * time.Second),
+		scanErr:    make(chan error, 1),
 		logsClient: client,
 	}
 
@@ -81,7 +82,7 @@ func (w *LogWriter) Write(data []byte) (int, error) {
 func (w *LogWriter) Close() error {
 	w.pw.Close()
 	w.stop()
-	return w.scanErr
+	return <-w.scanErr
 }
 
 func (w *LogWriter) Flush() error {
@@ -101,7 +102,7 @@ func (w *LogWriter) readLines() {
 		w.appendEvent(sc.Text())
 	}
 
-	w.scanErr = sc.Err()
+	w.scanErr <- sc.Err()
 }
 
 func (w *LogWriter) appendEvent(text string) {

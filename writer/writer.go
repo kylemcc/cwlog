@@ -79,6 +79,7 @@ func (w *LogWriter) Write(data []byte) (int, error) {
 }
 
 func (w *LogWriter) Close() error {
+	w.pw.Close()
 	w.stop()
 	return w.scanErr
 }

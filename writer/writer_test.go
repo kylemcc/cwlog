@@ -17,6 +17,7 @@ type mockLogsAPI struct {
 	events []*cloudwatchlogs.InputLogEvent
 }
 
+// PutLogEvents implements cloudwatchlogsiface.CloudWatchLogsAPI
 func (m *mockLogsAPI) PutLogEvents(input *cloudwatchlogs.PutLogEventsInput) (*cloudwatchlogs.PutLogEventsOutput, error) {
 	m.events = append(m.events, input.LogEvents...)
 	m.seq++
@@ -38,6 +39,7 @@ func newTestInput(input [][]byte) io.Reader {
 	return &mockStdin{data: input}
 }
 
+// Read implements io.Reader
 func (m *mockStdin) Read(b []byte) (int, error) {
 	if m.cnt >= len(m.data) {
 		return 0, io.EOF

@@ -11,9 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs/cloudwatchlogsiface"
 )
 
-// LogWriter ...
-//
-
 const (
 
 	// maxSize is the maximum number of bytes in a single cloudwatch
@@ -27,6 +24,10 @@ const (
 // Client is a CloudWatch Logs client
 type Client cloudwatchlogsiface.CloudWatchLogsAPI
 
+// LogWriter provides an io.Writer interface to CloudWatch Logs
+//
+// The zero-value is not usable. New should be used to construct
+// a new LogWriter
 type LogWriter struct {
 	sync.Mutex
 
@@ -36,15 +37,13 @@ type LogWriter struct {
 	// the log stream to which we will write
 	logStream string
 
+	// buf holds pending log events that have not yet been written to CloudWatch Logs
 	buf []*cloudwatchlogs.InputLogEvent
 
-	// bufSize is the
 	bufSize int
 
 	// ticker is used to periodically flush the buffer
 	ticker *time.Ticker
-
-	started bool
 
 	// scanErr will receieve the return value of the internal scanner
 	scanErr chan error
@@ -57,6 +56,7 @@ type LogWriter struct {
 	logsClient cloudwatchlogsiface.CloudWatchLogsAPI
 }
 
+// New constructs and returns a new LogWriter
 func New(logGroup, logStream string, client Client) *LogWriter {
 	pr, pw := io.Pipe()
 
@@ -75,23 +75,25 @@ func New(logGroup, logStream string, client Client) *LogWriter {
 	return &b
 }
 
+// Write implements io.Writer
 func (w *LogWriter) Write(data []byte) (int, error) {
 	return w.pw.Write(data)
 }
 
+// Close implements io.Closer. This method will stop the writer and flush
+// any buffered log events
 func (w *LogWriter) Close() error {
 	w.pw.Close()
 	w.stop()
 	return <-w.scanErr
 }
 
+// Flush writes any buffered log events to CloudWatch Logs
 func (w *LogWriter) Flush() error {
 	return nil
 }
 
 func (w *LogWriter) start() {
-	w.started = true
-
 	go w.readLines()
 }
 

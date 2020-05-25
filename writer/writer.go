@@ -36,7 +36,7 @@ type LogWriter struct {
 	// the log stream to which we will write
 	logStream string
 
-	buf []string
+	buf []*cloudwatchlogs.InputLogEvent
 
 	// bufSize is the
 	bufSize int
@@ -97,11 +97,19 @@ func (w *LogWriter) readLines() {
 	sc := bufio.NewScanner(w.pr)
 	sc.Split(bufio.ScanLines)
 	for sc.Scan() {
-		l := sc.Text()
-		w.buf = append(w.buf, l)
+		w.appendEvent(sc.Text())
 	}
 
 	w.scanErr = sc.Err()
+}
+
+func (w *LogWriter) appendEvent(text string) {
+	w.Lock()
+	defer w.Unlock()
+	w.buf = append(w.buf, &cloudwatchlogs.InputLogEvent{
+		Message:   &text,
+		Timestamp: aws.Int64(time.Now().UnixNano() / 1000000),
+	})
 }
 
 func (w *LogWriter) stop() {

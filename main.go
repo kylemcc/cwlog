@@ -15,6 +15,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/kylemcc/cwlog/writer"
 )
 
@@ -68,7 +70,9 @@ Arguments:
 }
 
 func run(logGroup, logStream string, src io.Reader) error {
-	w := writer.New(logGroup, logStream)
+	sess := session.Must(session.NewSession())
+	client := cloudwatchlogs.New(sess)
+	w := writer.New(logGroup, logStream, client)
 
 	_, err := io.Copy(w, src)
 	if err != nil {

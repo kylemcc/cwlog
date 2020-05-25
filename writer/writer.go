@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs/cloudwatchlogsiface"
 )
@@ -24,12 +24,8 @@ const (
 	maxSize = 1_048_576
 )
 
-var (
-	newLogsClient = func() cloudwatchlogsiface.CloudWatchLogsAPI {
-		sess := session.Must(session.NewSession())
-		return cloudwatchlogs.New(sess)
-	}
-)
+// Client is a CloudWatch Logs client
+type Client cloudwatchlogsiface.CloudWatchLogsAPI
 
 type LogWriter struct {
 	sync.Mutex
@@ -61,10 +57,8 @@ type LogWriter struct {
 	logsClient cloudwatchlogsiface.CloudWatchLogsAPI
 }
 
-func New(logGroup, logStream string) *LogWriter {
+func New(logGroup, logStream string, client Client) *LogWriter {
 	pr, pw := io.Pipe()
-
-	svc := newLogsClient()
 
 	b := LogWriter{
 		logGroup:   logGroup,
@@ -72,7 +66,7 @@ func New(logGroup, logStream string) *LogWriter {
 		pw:         pw,
 		pr:         pr,
 		ticker:     time.NewTicker(2 * time.Second),
-		logsClient: svc,
+		logsClient: client,
 	}
 
 	go b.start()

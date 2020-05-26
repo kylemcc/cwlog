@@ -51,6 +51,14 @@ func (m *mockStdin) Read(b []byte) (int, error) {
 	return len(d), nil
 }
 
+func mockNow() func() int64 {
+	cnt := int64(0)
+	return func() int64 {
+		cnt++
+		return cnt
+	}
+}
+
 func TestWriter(t *testing.T) {
 	type Events = []*cloudwatchlogs.InputLogEvent
 
@@ -71,7 +79,8 @@ func TestWriter(t *testing.T) {
 			}),
 			Events{
 				{
-					Message: aws.String("test input"),
+					Message:   aws.String("test input"),
+					Timestamp: aws.Int64(1),
 				},
 			},
 		},
@@ -84,13 +93,16 @@ func TestWriter(t *testing.T) {
 			}),
 			Events{
 				{
-					Message: aws.String("test input"),
+					Message:   aws.String("test input"),
+					Timestamp: aws.Int64(1),
 				},
 				{
-					Message: aws.String("different test input"),
+					Message:   aws.String("different test input"),
+					Timestamp: aws.Int64(2),
 				},
 				{
-					Message: aws.String("totally important log data"),
+					Message:   aws.String("totally important log data"),
+					Timestamp: aws.Int64(3),
 				},
 			},
 		},
@@ -102,10 +114,12 @@ func TestWriter(t *testing.T) {
 			}),
 			Events{
 				{
-					Message: aws.String("test input"),
+					Message:   aws.String("test input"),
+					Timestamp: aws.Int64(1),
 				},
 				{
-					Message: aws.String("no newline at the end"),
+					Message:   aws.String("no newline at the end"),
+					Timestamp: aws.Int64(2),
 				},
 			},
 		},
@@ -113,6 +127,7 @@ func TestWriter(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			now = mockNow()
 
 			logsClient := newLogsCLientTest()
 			w := New("group", "stream", logsClient)
@@ -125,8 +140,6 @@ func TestWriter(t *testing.T) {
 			if err := w.Close(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-
-			t.Logf("buf=%#v", w.buf)
 
 			if !reflect.DeepEqual(c.expected, logsClient.events) {
 				t.Errorf("log events did not matchc: got=%#v want=%#v", logsClient.events, c.expected)

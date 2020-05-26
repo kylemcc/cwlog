@@ -21,6 +21,11 @@ const (
 	maxSize = 1_048_576
 )
 
+// now returns the current timestamp. it's a variable here so we can swap it out for testing
+var now = func() int64 {
+	return time.Now().UnixNano() / 1000000
+}
+
 // Client is a CloudWatch Logs client
 type Client cloudwatchlogsiface.CloudWatchLogsAPI
 

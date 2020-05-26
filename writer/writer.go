@@ -1,3 +1,4 @@
+// Package writer provides an io.Writer interface to CloudWatch Logs
 package writer
 
 import (
@@ -177,6 +178,9 @@ func (w *LogWriter) handleError(err error) error {
 		switch aerr.Code() {
 		case cloudwatchlogs.ErrCodeDataAlreadyAcceptedException:
 			// data was already accepted
+			if e, ok := err.(*cloudwatchlogs.DataAlreadyAcceptedException); ok {
+				w.sequenceToken = *e.ExpectedSequenceToken
+			}
 			return nil
 		case cloudwatchlogs.ErrCodeInvalidSequenceTokenException:
 			if e, ok := err.(*cloudwatchlogs.InvalidSequenceTokenException); ok {

@@ -1,3 +1,7 @@
+// Copyright 2020 Kyle McCullough. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // cwlog is a small utility for sending log data to CloudWatch Logs. Given a
 // log group and stream name, cwlogger will read lines from standard input and
 // attempt to send those logs to CloudWatch Logs.

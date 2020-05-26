@@ -14,6 +14,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -21,56 +22,58 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
+	"github.com/genuinetools/pkg/cli"
 	"github.com/kylemcc/cwlog/writer"
 )
 
 var (
 	tee bool
+
+	logGroup  string
+	logStream string
 )
 
-func init() {
-	flag.BoolVar(&tee, "tee", true, "If true, output will be copied to stdout")
-	flag.BoolVar(&tee, "t", true, "If true, output will be copied to stdout")
-	flag.Usage = usage
-}
-
 func main() {
-	flag.Parse()
+	p := cli.NewProgram()
+	p.Name = "cwlog"
+	p.Description = `A tee(1)-like command for piping output to CloudWatch Logs.
 
-	if len(os.Args) < 3 {
-		usage()
+This program will read line-oriented data from standard input and send
+log events to CloudWatch Logs. If the specified log group and/or log stream
+do not exist, cwlog will attempt to create them. CloudWatch Logs also
+requires a sequence token for existing streams that already contain log
+events. If an existing stream is specified, cwlog will automatically
+retrieve the next sequence token.
+
+The execution of this program is optimized for the scenario where it is
+invoked with an existing-but-empty log stream. It first attempts to write to
+the specified log stream, and only tries to create the log group or log stream
+if it receives an error.`
+
+	p.FlagSet = flag.NewFlagSet("global", flag.ExitOnError)
+	p.FlagSet.BoolVar(&tee, "tee", true, "If true, output will be copied to stdout")
+	p.FlagSet.BoolVar(&tee, "t", true, "If true, output will be copied to stdout")
+	p.FlagSet.StringVar(&logGroup, "log-group", os.Getenv("CWLOG_LOG_GROUP"), "(Required) The name of the log group where logs should be sent. The program will attempt to create this if it does not exist. Default: $CWLOG_LOG_GROUP")
+	p.FlagSet.StringVar(&logGroup, "g", os.Getenv("CWLOG_LOG_GROUP"), "(Required) The name of the log group where logs should be sent. The program will attempt to create this if it does not exist. Default: $CWLOG_LOG_GROUP")
+	p.FlagSet.StringVar(&logStream, "log-stream", os.Getenv("CWLOG_LOG_STREAM"), "(Required) The name of the log stream where logs should be sent. The program will attempt to create this if it does not exist. Default: $CWLOG_LOG_STREAM")
+	p.FlagSet.StringVar(&logStream, "s", os.Getenv("CWLOG_LOG_STREAM"), "(Required) The name of the log stream where logs should be sent. The program will attempt to create this if it does not exist. Default: $CWLOG_LOG_STREAM")
+
+	p.Before = func(ctx context.Context) error {
+		if logGroup == "" || logStream == "" {
+			p.FlagSet.Usage()
+			return fmt.Errorf("log-group and log-stream are required")
+		}
+		return nil
 	}
 
-	logGroup := os.Args[1]
-	logStream := os.Args[2]
-
-	if err := run(logGroup, logStream, getSource(tee)); err != nil {
-		fmt.Printf("error: failed to write logs: %v\n", err)
-		os.Exit(1)
+	p.Action = func(ctx context.Context, args []string) error {
+		if err := run(logGroup, logStream, getSource(tee)); err != nil {
+			return fmt.Errorf("error: failed to write logs: %v", err)
+		}
+		return nil
 	}
-}
 
-func usage() {
-	fmt.Printf(`Usage: %s [options] log_group_name log_stream_name
-
-A tee-like command for piping output to CloudWatch Logs.
-
-Options:
-`, os.Args[0])
-
-	flag.PrintDefaults()
-
-	fmt.Printf(`
-Arguments:
-
-	log_group_name: (Required) The name of the log group where logs should be sent. The
-		program will attempt to create this if it does not exist.
-
-	log_stream_name: (Required) The name of the log stream where logs should be sent. The
-		program will attempt to create this if it does not exist.
-`)
-
-	os.Exit(1)
+	p.Run()
 }
 
 func run(logGroup, logStream string, src io.Reader) error {

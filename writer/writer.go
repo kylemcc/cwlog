@@ -2,11 +2,13 @@ package writer
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs/cloudwatchlogsiface"
 )
@@ -19,6 +21,16 @@ const (
 	//
 	// https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html
 	maxSize = 1_048_576
+
+	// maxEvents is the maximum number of events is a single cloudwatch
+	// log batch.
+	//
+	// https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html
+	maxEvents = 10_000
+
+	// maxRetries is the max number of times a cloudwatch operation will be attempted
+	// before giving up
+	maxRetries = 5
 )
 
 // now returns the current timestamp. it's a variable here so we can swap it out for testing
@@ -53,10 +65,26 @@ type LogWriter struct {
 	// scanErr will receieve the return value of the internal scanner
 	scanErr chan error
 
+	// flushErr holds any error encountered while attempting to write
+	// logs to CloudWatch Logs. If the writer encounters an error,
+	// and exhausts retry attepmts, it will not continue trying to write logs
+	flushErr error
+
+	// close will receive a message when the writer is closed
+	closed chan struct{}
+
+	// signalFlush will receive a message when the writer wants to trigger a Flush operation
+	signalFlush chan struct{}
+
 	// pw and pr (io.Pipe) are used to pipe input delivered to Write to the internal
 	// bufio.Scanner which reads input in a linewise fashion
 	pw *io.PipeWriter
 	pr *io.PipeReader
+
+	// sequenceToken is token returned by cloudwatch logs after a PutLogEvents request. This
+	// token is required on all calls to PutLogEvents except the first call to a newly created
+	// log stream.
+	sequenceToken string
 
 	logsClient cloudwatchlogsiface.CloudWatchLogsAPI
 }
@@ -66,13 +94,15 @@ func New(logGroup, logStream string, client Client) *LogWriter {
 	pr, pw := io.Pipe()
 
 	b := LogWriter{
-		logGroup:   logGroup,
-		logStream:  logStream,
-		pw:         pw,
-		pr:         pr,
-		ticker:     time.NewTicker(2 * time.Second),
-		scanErr:    make(chan error, 1),
-		logsClient: client,
+		logGroup:    logGroup,
+		logStream:   logStream,
+		pw:          pw,
+		pr:          pr,
+		ticker:      time.NewTicker(2 * time.Second),
+		scanErr:     make(chan error),
+		closed:      make(chan struct{}),
+		signalFlush: make(chan struct{}),
+		logsClient:  client,
 	}
 
 	go b.start()
@@ -90,16 +120,104 @@ func (w *LogWriter) Write(data []byte) (int, error) {
 func (w *LogWriter) Close() error {
 	w.pw.Close()
 	w.stop()
-	return <-w.scanErr
+
+	if err := <-w.scanErr; err != nil {
+		return err
+	}
+
+	return w.flushAll()
 }
 
 // Flush writes any buffered log events to CloudWatch Logs
 func (w *LogWriter) Flush() error {
-	return nil
+	if w.flushErr != nil {
+		return w.flushErr
+
+	}
+
+	w.Lock()
+	defer w.Unlock()
+
+	if len(w.buf) == 0 {
+		return nil
+	}
+
+	events := w.drainBuffer()
+
+	input := &cloudwatchlogs.PutLogEventsInput{
+		LogEvents:     events,
+		LogGroupName:  &w.logGroup,
+		LogStreamName: &w.logStream,
+	}
+
+	err := retry(func() error {
+		if w.sequenceToken != "" {
+			input.SetSequenceToken(w.sequenceToken)
+		}
+
+		resp, err := w.logsClient.PutLogEvents(input)
+		if err != nil {
+			return w.handleError(err)
+		}
+
+		w.sequenceToken = *resp.NextSequenceToken
+		return nil
+	})
+
+	w.flushErr = err
+	return err
+}
+
+func (w *LogWriter) handleError(err error) error {
+	if aerr, ok := err.(awserr.Error); ok {
+		switch aerr.Code() {
+		case cloudwatchlogs.ErrCodeDataAlreadyAcceptedException:
+			// data was already accepted
+			return nil
+		case cloudwatchlogs.ErrCodeInvalidSequenceTokenException:
+			if e, ok := err.(*cloudwatchlogs.InvalidSequenceTokenException); ok {
+				w.sequenceToken = *e.ExpectedSequenceToken
+			}
+		case cloudwatchlogs.ErrCodeResourceNotFoundException:
+			if err := w.createLogStream(); err != nil {
+				return err
+			}
+		}
+	}
+	return err
+}
+
+func (w *LogWriter) createLogStream() error {
+	//TODO
+	return fmt.Errorf("not implemented")
+}
+
+func (w *LogWriter) drainBuffer() []*cloudwatchlogs.InputLogEvent {
+	var (
+		size   int
+		cnt    int
+		events []*cloudwatchlogs.InputLogEvent
+	)
+
+	for _, e := range w.buf {
+		if size > maxSize || len(events) >= maxEvents {
+			break
+		}
+
+		size += len(*e.Message) + 26
+		events = append(events, e)
+		cnt++
+	}
+
+	w.buf = w.buf[cnt:]
+	w.bufSize -= size
+
+	return events
 }
 
 func (w *LogWriter) start() {
 	go w.readLines()
+	go w.periodicFlush()
 }
 
 func (w *LogWriter) readLines() {
@@ -117,10 +235,57 @@ func (w *LogWriter) appendEvent(text string) {
 	defer w.Unlock()
 	w.buf = append(w.buf, &cloudwatchlogs.InputLogEvent{
 		Message:   &text,
-		Timestamp: aws.Int64(time.Now().UnixNano() / 1000000),
+		Timestamp: aws.Int64(now()),
 	})
+
+	w.bufSize += len(text) + 26
+}
+
+func (w *LogWriter) periodicFlush() {
+	for {
+		select {
+		case <-w.ticker.C:
+			w.Flush()
+		case <-w.signalFlush:
+			w.Flush()
+		case <-w.closed:
+			return
+		}
+	}
 }
 
 func (w *LogWriter) stop() {
 	w.ticker.Stop()
+	w.closed <- struct{}{}
+}
+
+func (w *LogWriter) flushAll() error {
+	for len(w.buf) > 0 {
+		if err := w.Flush(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func retry(f func() error) error {
+	var (
+		cnt int
+		err error
+	)
+
+	for cnt < maxRetries {
+		if cnt > 0 {
+			time.Sleep(time.Duration(cnt) * 100 * time.Millisecond)
+		}
+
+		if err = f(); err == nil {
+			return nil
+		}
+
+		cnt++
+	}
+
+	return err
 }

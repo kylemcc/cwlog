@@ -3,7 +3,6 @@ package writer
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -186,9 +185,12 @@ func (w *LogWriter) handleError(err error) error {
 			if e, ok := err.(*cloudwatchlogs.InvalidSequenceTokenException); ok {
 				w.sequenceToken = *e.ExpectedSequenceToken
 			}
+			return errIgnore
 		case cloudwatchlogs.ErrCodeResourceNotFoundException:
 			if err := w.createLogStream(); err != nil {
-				return err
+				return noRetry(err)
+			} else {
+				return errIgnore
 			}
 		}
 	}
@@ -196,8 +198,32 @@ func (w *LogWriter) handleError(err error) error {
 }
 
 func (w *LogWriter) createLogStream() error {
-	//TODO
-	return fmt.Errorf("not implemented")
+	lgInput := cloudwatchlogs.CreateLogGroupInput{
+		LogGroupName: &w.logGroup,
+	}
+
+	_, err := w.logsClient.CreateLogGroup(&lgInput)
+	if err != nil {
+		// Resource already created is ok. Otherwise, return the error
+		if ae, ok := err.(awserr.Error); !ok || ae.Code() != cloudwatchlogs.ErrCodeResourceAlreadyExistsException {
+			return err
+		}
+	}
+
+	lsInput := cloudwatchlogs.CreateLogStreamInput{
+		LogGroupName:  &w.logGroup,
+		LogStreamName: &w.logStream,
+	}
+
+	_, err = w.logsClient.CreateLogStream(&lsInput)
+	if err != nil {
+		// Resource already created is ok. Otherwise, return the error
+		if ae, ok := err.(awserr.Error); !ok || ae.Code() != cloudwatchlogs.ErrCodeResourceAlreadyExistsException {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (w *LogWriter) drainBuffer() []*cloudwatchlogs.InputLogEvent {

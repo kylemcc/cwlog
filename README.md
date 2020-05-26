@@ -48,7 +48,6 @@ $ export CWLOG_LOG_STREAM=my-log-stream
 $ some-command | cwlog
 
 # Use command grouping to capture multiple commands more efficiently:
-
 $ { command-1; command-2; command-3 } | cwlog
 ```
 

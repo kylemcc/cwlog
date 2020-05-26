@@ -28,6 +28,10 @@ const (
 	// https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html
 	maxEvents = 10_000
 
+	// eventSize is the static size of each event object excluding the message text. This is used
+	// to calculate the size of each log batch.
+	eventSize = 26
+
 	// maxRetries is the max number of times a cloudwatch operation will be attempted
 	// before giving up
 	maxRetries = 5
@@ -204,7 +208,7 @@ func (w *LogWriter) drainBuffer() []*cloudwatchlogs.InputLogEvent {
 			break
 		}
 
-		size += len(*e.Message) + 26
+		size += len(*e.Message) + eventSize
 		events = append(events, e)
 		cnt++
 	}

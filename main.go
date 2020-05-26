@@ -53,10 +53,10 @@ if it receives an error.`
 	p.FlagSet = flag.NewFlagSet("global", flag.ExitOnError)
 	p.FlagSet.BoolVar(&tee, "tee", true, "If true, output will be copied to stdout")
 	p.FlagSet.BoolVar(&tee, "t", true, "If true, output will be copied to stdout")
-	p.FlagSet.StringVar(&logGroup, "log-group", os.Getenv("CWLOG_LOG_GROUP"), "(Required) The name of the log group where logs should be sent. The program will attempt to create this if it does not exist. Default: $CWLOG_LOG_GROUP")
-	p.FlagSet.StringVar(&logGroup, "g", os.Getenv("CWLOG_LOG_GROUP"), "(Required) The name of the log group where logs should be sent. The program will attempt to create this if it does not exist. Default: $CWLOG_LOG_GROUP")
-	p.FlagSet.StringVar(&logStream, "log-stream", os.Getenv("CWLOG_LOG_STREAM"), "(Required) The name of the log stream where logs should be sent. The program will attempt to create this if it does not exist. Default: $CWLOG_LOG_STREAM")
-	p.FlagSet.StringVar(&logStream, "s", os.Getenv("CWLOG_LOG_STREAM"), "(Required) The name of the log stream where logs should be sent. The program will attempt to create this if it does not exist. Default: $CWLOG_LOG_STREAM")
+	p.FlagSet.StringVar(&logGroup, "log-group", os.Getenv("CWLOG_LOG_GROUP"), "(Required) The name of the log group where logs should be sent. The program will attempt to create this if it does not exist. [env CWLOG_LOG_GROUP=]")
+	p.FlagSet.StringVar(&logGroup, "g", os.Getenv("CWLOG_LOG_GROUP"), "(Required) The name of the log group where logs should be sent. The program will attempt to create this if it does not exist. [env CWLOG_LOG_GROUP=]")
+	p.FlagSet.StringVar(&logStream, "log-stream", os.Getenv("CWLOG_LOG_STREAM"), "(Required) The name of the log stream where logs should be sent. The program will attempt to create this if it does not exist. [env CWLOG_LOG_STREAM=]")
+	p.FlagSet.StringVar(&logStream, "s", os.Getenv("CWLOG_LOG_STREAM"), "(Required) The name of the log stream where logs should be sent. The program will attempt to create this if it does not exist. [env CWLOG_LOG_STREAM=]")
 
 	p.Before = func(ctx context.Context) error {
 		if logGroup == "" || logStream == "" {

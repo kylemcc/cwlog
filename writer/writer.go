@@ -280,24 +280,3 @@ func (w *LogWriter) flushAll() error {
 
 	return nil
 }
-
-func retry(f func() error) error {
-	var (
-		cnt int
-		err error
-	)
-
-	for cnt < maxRetries {
-		if cnt > 0 {
-			time.Sleep(time.Duration(cnt) * 100 * time.Millisecond)
-		}
-
-		if err = f(); err == nil {
-			return nil
-		}
-
-		cnt++
-	}
-
-	return err
-}

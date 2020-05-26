@@ -235,6 +235,10 @@ func (w *LogWriter) readLines() {
 }
 
 func (w *LogWriter) appendEvent(text string) {
+	if text == "" {
+		return
+	}
+
 	w.Lock()
 	defer w.Unlock()
 	w.buf = append(w.buf, &cloudwatchlogs.InputLogEvent{

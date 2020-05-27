@@ -189,9 +189,8 @@ func (w *LogWriter) handleError(err error) error {
 		case cloudwatchlogs.ErrCodeResourceNotFoundException:
 			if err := w.createLogStream(); err != nil {
 				return noRetry(err)
-			} else {
-				return errIgnore
 			}
+			return errIgnore
 		}
 	}
 	return err

@@ -86,7 +86,7 @@ func run(logGroup, logStream string, src io.Reader) error {
 		return fmt.Errorf("error writing logs: %w", err)
 	}
 
-	// flush any remaing data in the buffer
+	// flush any remaining data in the buffer
 	return w.Close()
 }
 

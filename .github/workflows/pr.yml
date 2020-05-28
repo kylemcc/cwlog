@@ -1,0 +1,18 @@
+on: pull_request
+name: Check PR
+jobs:
+  check_pr:
+    name: Check PR
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+        go-version: 1.14
+    - name: install checkers
+      run: |
+        go get honnef.co/go/tools/cmd/staticcheck
+        go get golang.org/x/lint/golint
+        go get github.com/client9/misspell/cmd/misspell
+    - name: check
+      run: make check

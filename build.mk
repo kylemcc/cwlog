@@ -6,7 +6,7 @@ BUILDDIR := dist
 
 # capture version information
 GITSHA := $(shell git rev-parse --short HEAD)
-VERSION := $(shell echo "version")
+VERSION := $(shell cat version.txt)
 
 
 CTIMEVAR=-X $(PKG)/version.GitCommit=$(GITSHA) -X $(PKG)/version.Version=$(VERSION)

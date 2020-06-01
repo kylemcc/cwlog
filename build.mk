@@ -54,6 +54,11 @@ md5sum $(1) > $(1).md5;
 sha256sum $(1) > $(1).sha256;
 endef
 
+.PHONY: image
+image: ## Builds a Docker image
+	@echo "+ $@"
+	@docker build --rm --force-rm -t $(REGISTRY)/$(NAME) .
+
 .PHONY: calculate-checksums
 calculate-checksums: $(wildcard BUILDDIR)/* ## Calculates checksums for release artifacts
 	$(RM) $(BUILDDIR)/*.md5 $(BUILDDIR)/*.sha256

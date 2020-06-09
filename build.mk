@@ -108,8 +108,9 @@ test: ## Runs `go test` and makes sure the tests pass
 check: test fmt lint staticcheck vet ## Runs test, fmt, lint, staticcheck, and vet
 
 .PHONY: install
+install:
 	@echo "+ $@"
-	@$(GO) install
+	@$(GO) install -a -tags "$(BUILDTAGS)" ${GO_LDFLAGS}
 
 .PHONY: tag
 tag: ## Creates a new git tag for the current version

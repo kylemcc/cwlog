@@ -50,7 +50,6 @@ build-release: *.go ## Builds release binaries
 		$(GO_LDFLAGS_STATIC)
 
 define checksum
-md5sum $(1) > $(1).md5;
 sha256sum $(1) > $(1).sha256;
 endef
 
@@ -61,7 +60,7 @@ image: ## Builds a Docker image
 
 .PHONY: calculate-checksums
 calculate-checksums: $(wildcard BUILDDIR)/* ## Calculates checksums for release artifacts
-	$(RM) $(BUILDDIR)/*.md5 $(BUILDDIR)/*.sha256
+	$(RM) $(BUILDDIR)/*.sha256
 	$(foreach bin,$(wildcard $(BUILDDIR)/*), $(call checksum,$(bin)))
 
 

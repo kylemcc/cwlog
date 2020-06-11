@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/genuinetools/pkg/cli"
+	"github.com/kylemcc/cwlog/version"
 	"github.com/kylemcc/cwlog/writer"
 )
 
@@ -36,6 +37,8 @@ var (
 func main() {
 	p := cli.NewProgram()
 	p.Name = "cwlog"
+	p.Version = version.Version
+	p.GitCommit = version.GitCommit
 	p.Description = `A tee(1)-like command for piping output to CloudWatch Logs.
 
 This program will read line-oriented data from standard input and send

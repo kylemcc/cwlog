@@ -1,0 +1,12 @@
+on: push
+name: Publish Image
+jobs:
+  publish-image:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: docker login
+      run: |
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://docker.pkg.github.com -u actions --password-stdin
+    - name: Build and push image
+      run: make push-image

@@ -7,6 +7,7 @@ BUILDDIR := dist
 # capture version information
 GITSHA := $(shell git rev-parse --short HEAD)
 VERSION := $(shell cat version.txt)
+IMAGETAG := $(shell git describe --tags --exact-match 2>/dev/null || git symbolic-ref --short HEAD)
 
 
 CTIMEVAR=-X $(PKG)/version.GitCommit=$(GITSHA) -X $(PKG)/version.Version=$(VERSION)
@@ -57,6 +58,19 @@ endef
 image: ## Builds a Docker image
 	@echo "+ $@"
 	@docker build --rm --force-rm -t $(REGISTRY)/$(NAME) .
+
+.PHONY: tag-image
+tag-image: image
+	@echo "+ $@"
+	@docker tag $(REGISTRY)/$(NAME) $(REGISTRY)/$(NAME):$(GITSHA)
+	@docker tag $(REGISTRY)/$(NAME) $(REGISTRY)/$(NAME):$(IMAGETAG)
+
+.PHONY: push-image
+push-image: tag-image
+	@echo "+ $@"
+	@docker push $(REGISTRY)/$(NAME)
+	@docker push $(REGISTRY)/$(NAME):$(GITSHA)
+	@docker push $(REGISTRY)/$(NAME):$(IMAGETAG)
 
 .PHONY: calculate-checksums
 calculate-checksums: $(wildcard BUILDDIR)/* ## Calculates checksums for release artifacts

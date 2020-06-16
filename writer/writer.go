@@ -197,24 +197,39 @@ func (w *LogWriter) handleError(err error) error {
 }
 
 func (w *LogWriter) createLogStream() error {
-	lgInput := cloudwatchlogs.CreateLogGroupInput{
-		LogGroupName: &w.logGroup,
-	}
-
-	_, err := w.logsClient.CreateLogGroup(&lgInput)
-	if err != nil {
-		// Resource already created is ok. Otherwise, return the error
-		if ae, ok := err.(awserr.Error); !ok || ae.Code() != cloudwatchlogs.ErrCodeResourceAlreadyExistsException {
-			return err
-		}
-	}
-
 	lsInput := cloudwatchlogs.CreateLogStreamInput{
 		LogGroupName:  &w.logGroup,
 		LogStreamName: &w.logStream,
 	}
 
-	_, err = w.logsClient.CreateLogStream(&lsInput)
+	_, err := w.logsClient.CreateLogStream(&lsInput)
+	if err != nil {
+		if ae, ok := err.(awserr.Error); ok {
+			switch ae.Code() {
+			case cloudwatchlogs.ErrCodeResourceAlreadyExistsException:
+				// Resource already created is ok
+			case cloudwatchlogs.ErrCodeResourceNotFoundException:
+				if err := w.createLogGroup(); err != nil {
+					return err
+				}
+
+				// retry creating the log stream
+				return errIgnore
+			default:
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (w *LogWriter) createLogGroup() error {
+	lgInput := cloudwatchlogs.CreateLogGroupInput{
+		LogGroupName: &w.logGroup,
+	}
+
+	_, err := w.logsClient.CreateLogGroup(&lgInput)
 	if err != nil {
 		// Resource already created is ok. Otherwise, return the error
 		if ae, ok := err.(awserr.Error); !ok || ae.Code() != cloudwatchlogs.ErrCodeResourceAlreadyExistsException {

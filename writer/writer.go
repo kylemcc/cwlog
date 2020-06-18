@@ -280,7 +280,7 @@ func (w *LogWriter) readLines() {
 
 func (w *LogWriter) appendEvent(text string) {
 	if text == "" {
-		return
+		text = "\u0000"
 	}
 
 	w.Lock()

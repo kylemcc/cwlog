@@ -123,6 +123,33 @@ func TestWriter(t *testing.T) {
 				},
 			},
 		},
+		{
+			"empty lines",
+			newTestInput([][]byte{
+				[]byte("test input\n"),
+				[]byte("\n"),
+				[]byte("more input\n"),
+				[]byte("\n"),
+			}),
+			Events{
+				{
+					Message:   aws.String("test input"),
+					Timestamp: aws.Int64(1),
+				},
+				{
+					Message:   aws.String("\u0000"),
+					Timestamp: aws.Int64(2),
+				},
+				{
+					Message:   aws.String("more input"),
+					Timestamp: aws.Int64(3),
+				},
+				{
+					Message:   aws.String("\u0000"),
+					Timestamp: aws.Int64(4),
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {

@@ -34,7 +34,7 @@ Commands:
 ```
 
 First, configure your environment with credentials that have access to CloudWatch Logs. This tool uses the Go AWS SDK, which loads
-credentials as described [1](here).
+credentials as described [here][1].
 
 Next, pipe the log that should be sent to CloudWatch Logs to `cwlog`:
 

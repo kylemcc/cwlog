@@ -12,7 +12,7 @@ jobs:
         fetch-depth: 0
     - uses: actions/setup-go@v2
       with:
-        go-version: 1.14
+        go-version: 1.17
     - id: tag-name
       run: |
         echo ::set-output name=TAG_NAME::${GITHUB_REF#refs/tags/}

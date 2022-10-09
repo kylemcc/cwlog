@@ -1,4 +1,7 @@
-on: push
+on:
+  push:
+    branches:
+      - '!dependabot/**'
 name: Publish Image
 jobs:
   publish-image:

@@ -7,7 +7,7 @@ jobs:
   publish-image:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4.0.0
+    - uses: actions/checkout@v4.1.0
     - name: docker login
       run: |
         echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://docker.pkg.github.com -u actions --password-stdin
